@@ -359,6 +359,10 @@ jQuery(document).ready(function($) {
         if (isSubmitting) return;
         
         const listingId = $(this).data('listing-id');
+        const button = $(this);
+        const originalText = button.html();
+        
+        button.html('<i class="blp-spinner"></i> ' + __('Loading...', 'business-listings-pro')).prop('disabled', true);
         
         // Get listing data via AJAX
         $.post(blp_ajax.ajax_url, {
@@ -371,12 +375,16 @@ jQuery(document).ready(function($) {
                 populateListingForm(response.data, listingId);
                 showAddListingModal();
                 $('#blp-listing-modal-title').text(__('Edit Listing', 'business-listings-pro'));
+                $('#blp-listing-form button[type="submit"] .blp-btn-text').text(__('Update Listing', 'business-listings-pro'));
             } else {
                 showMessage(response.data || __('Error loading listing data.', 'business-listings-pro'), 'error');
             }
         })
         .fail(function() {
             showMessage(__('Error loading listing data.', 'business-listings-pro'), 'error');
+        })
+        .always(function() {
+            button.html(originalText).prop('disabled', false);
         });
     }
     
@@ -491,6 +499,7 @@ jQuery(document).ready(function($) {
         $('#blp-listing-form')[0].reset();
         $('#listing-id').val('');
         $('#blp-listing-modal-title').text(__('Add New Listing', 'business-listings-pro'));
+        $('#blp-listing-form button[type="submit"] .blp-btn-text').text(__('Save Listing', 'business-listings-pro'));
         $('#image-preview').hide();
         $('.blp-form-group').removeClass('has-error');
         $('.blp-error-message').remove();
@@ -505,6 +514,12 @@ jQuery(document).ready(function($) {
         $('#listing-address').val(data.address);
         $('#listing-website').val(data.website);
         $('#listing-email').val(data.email);
+        
+        // Show existing image if available
+        if (data.image_url) {
+            $('#image-preview img').attr('src', data.image_url);
+            $('#image-preview').show();
+        }
     }
     
     // Utility functions
@@ -549,9 +564,26 @@ jQuery(document).ready(function($) {
                            type === 'success' ? 'blp-message-success' : 
                            type === 'warning' ? 'blp-message-warning' : 'blp-message-info';
         
+        // Add icon based on type
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>';
+                break;
+            case 'error':
+                icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+                break;
+            case 'warning':
+                icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+                break;
+            default:
+                icon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+        }
+        
         const messageHtml = `
             <div class="blp-message ${messageClass}">
                 <div class="blp-message-content">
+                    <div class="blp-message-icon">${icon}</div>
                     <span class="blp-message-text">${message}</span>
                     <button class="blp-message-close">&times;</button>
                 </div>
@@ -560,12 +592,12 @@ jQuery(document).ready(function($) {
         
         $('body').append(messageHtml);
         
-        // Auto-dismiss after 5 seconds
+        // Auto-dismiss after 6 seconds for better UX
         setTimeout(() => {
             $('.blp-message').fadeOut(300, function() {
                 $(this).remove();
             });
-        }, 5000);
+        }, 6000);
         
         // Handle manual dismiss
         $('.blp-message-close').on('click', function() {
@@ -650,5 +682,69 @@ jQuery(document).ready(function($) {
                 content.css('max-height', $(window).height() - 40);
             }
         });
+    });
+    
+    // Enhanced form validation with real-time feedback
+    $('input[required], textarea[required], select[required]').on('blur', function() {
+        const field = $(this);
+        const value = field.val().trim();
+        const group = field.closest('.blp-form-group');
+        
+        if (!value) {
+            group.addClass('has-error');
+            if (!group.find('.blp-error-message').length) {
+                group.append('<div class="blp-error-message">' + __('This field is required.', 'business-listings-pro') + '</div>');
+            }
+        } else {
+            group.removeClass('has-error');
+            group.find('.blp-error-message').remove();
+        }
+    });
+    
+    // Email validation
+    $('input[type="email"]').on('blur', function() {
+        const field = $(this);
+        const value = field.val().trim();
+        const group = field.closest('.blp-form-group');
+        
+        if (value && !isValidEmail(value)) {
+            group.addClass('has-error');
+            group.find('.blp-error-message').remove();
+            group.append('<div class="blp-error-message">' + __('Please enter a valid email address.', 'business-listings-pro') + '</div>');
+        }
+    });
+    
+    // URL validation
+    $('input[type="url"]').on('blur', function() {
+        const field = $(this);
+        const value = field.val().trim();
+        const group = field.closest('.blp-form-group');
+        
+        if (value && !isValidUrl(value)) {
+            group.addClass('has-error');
+            group.find('.blp-error-message').remove();
+            group.append('<div class="blp-error-message">' + __('Please enter a valid URL (e.g., https://example.com).', 'business-listings-pro') + '</div>');
+        }
+    });
+    
+    function isValidUrl(url) {
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+    
+    // Add loading animation to buttons
+    $('.blp-btn').on('click', function() {
+        const button = $(this);
+        if (!button.hasClass('blp-loading') && button.attr('type') === 'submit') {
+            setTimeout(() => {
+                if (!button.hasClass('blp-loading')) {
+                    button.addClass('blp-btn-loading-state');
+                }
+            }, 100);
+        }
     });
 });

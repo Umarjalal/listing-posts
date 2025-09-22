@@ -43,6 +43,7 @@ class BusinessListingsPro {
         // Admin AJAX handlers
         add_action('wp_ajax_blp_delete_plan', array($this, 'admin_delete_plan'));
         add_action('wp_ajax_blp_update_listing_status', array($this, 'admin_update_listing_status'));
+        add_action('wp_ajax_blp_admin_delete_listing', array($this, 'admin_delete_listing'));
         add_action('wp_ajax_blp_test_api_connection', array($this, 'admin_test_api_connection'));
         
         // Hooks
@@ -200,6 +201,15 @@ class BusinessListingsPro {
         
         add_submenu_page(
             'business-listings-pro',
+            __('All Listings', 'business-listings-pro'),
+            __('All Listings', 'business-listings-pro'),
+            'manage_options',
+            'blp-all-listings',
+            array($this, 'all_listings_page')
+        );
+        
+        add_submenu_page(
+            'business-listings-pro',
             __('Plans', 'business-listings-pro'),
             __('Plans', 'business-listings-pro'),
             'manage_options',
@@ -330,6 +340,10 @@ class BusinessListingsPro {
     // Admin page methods
     public function admin_page() {
         include BLP_PLUGIN_PATH . 'admin/main.php';
+    }
+    
+    public function all_listings_page() {
+        include BLP_PLUGIN_PATH . 'admin/listings.php';
     }
     
     public function plans_page() {
@@ -632,7 +646,8 @@ class BusinessListingsPro {
             'phone' => get_post_meta($listing_id, 'business_phone', true),
             'address' => get_post_meta($listing_id, 'business_address', true),
             'website' => get_post_meta($listing_id, 'business_website', true),
-            'email' => get_post_meta($listing_id, 'business_email', true)
+            'email' => get_post_meta($listing_id, 'business_email', true),
+            'image_url' => get_the_post_thumbnail_url($listing_id, 'medium')
         );
         
         wp_send_json_success($data);
@@ -700,6 +715,22 @@ class BusinessListingsPro {
         }
         
         wp_send_json_error(__('Invalid API type.', 'business-listings-pro'));
+    }
+    
+    public function admin_delete_listing() {
+        check_ajax_referer('blp_admin_nonce', 'nonce');
+        
+        if (!current_user_can('delete_others_posts')) {
+            wp_send_json_error(__('Permission denied.', 'business-listings-pro'));
+        }
+        
+        $listing_id = intval($_POST['listing_id']);
+        
+        if (wp_delete_post($listing_id, true)) {
+            wp_send_json_success(__('Listing deleted successfully.', 'business-listings-pro'));
+        } else {
+            wp_send_json_error(__('Error deleting listing.', 'business-listings-pro'));
+        }
     }
     
     // Utility methods
